@@ -105,27 +105,39 @@ async function handleCharx(file) {
 // --- .png 카드 파일 처리 ---
 async function handlePng(file) {
     const buffer = await file.arrayBuffer();
-    const chunks = extract(new Uint8Array(buffer));
+    // ✨ 여기가 수정된 부분입니다. 'window.extract'로 변경!
+    const chunks = window.extract(new Uint8Array(buffer));
     const textChunks = chunks.filter(chunk => chunk.name === 'tEXt');
     
     let mainDataStr = null;
     const assets = {};
 
     textChunks.forEach(chunk => {
-        const [key, value] = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(chunk.data).split('\x00');
-        if (key.startsWith('chara-ext-asset_')) {
-            const assetIndex = parseInt(key.replace('chara-ext-asset_:', ''), 10);
-            if (!isNaN(assetIndex)) {
-                // Base64 디코딩
-                const byteString = atob(value);
-                const byteArray = new Uint8Array(byteString.length);
-                for (let i = 0; i < byteString.length; i++) {
-                    byteArray[i] = byteString.charCodeAt(i);
+        try {
+            const decoder = new TextDecoder('utf-8', { fatal: true });
+            const decodedString = decoder.decode(chunk.data);
+            const nullIndex = decodedString.indexOf('\x00');
+            if (nullIndex === -1) return;
+
+            const key = decodedString.substring(0, nullIndex);
+            const value = decodedString.substring(nullIndex + 1);
+
+            if (key.startsWith('chara-ext-asset_')) {
+                const assetIndex = parseInt(key.replace('chara-ext-asset_:', ''), 10);
+                if (!isNaN(assetIndex)) {
+                    // Base64 디코딩
+                    const byteString = atob(value);
+                    const byteArray = new Uint8Array(byteString.length);
+                    for (let i = 0; i < byteString.length; i++) {
+                        byteArray[i] = byteString.charCodeAt(i);
+                    }
+                    assets[assetIndex] = byteArray;
                 }
-                assets[assetIndex] = byteArray;
+            } else if (key === 'chara' || key === 'ccv3') {
+                mainDataStr = value;
             }
-        } else if (key === 'chara' || key === 'ccv3') {
-            mainDataStr = value;
+        } catch (e) {
+            console.warn("UTF-8 디코딩 실패, tEXt 청크를 건너뜁니다:", e);
         }
     });
 
@@ -152,10 +164,11 @@ async function handlePng(file) {
         
         assetList.forEach(item => {
             let uri, name, ext;
-            if (typeof item === 'object' && item !== null) { // v3
+            if (typeof item === 'object' && item !== null && !Array.isArray(item)) { // v3
                 ({ uri, name, ext } = item);
             } else if (Array.isArray(item) && item.length >= 2) { // v2
-                name = item[0].split('/').pop().replace(/\.[^/.]+$/, "");
+                const pathParts = item[0].split(/[\\/]/);
+                name = pathParts.pop().replace(/\.[^/.]+$/, "");
                 uri = item[1];
                 ext = item.length > 2 ? item[2] : 'dat';
             } else {
