@@ -1,4 +1,3 @@
-// ✨ 1. 파일 최상단에 import 문 추가
 import extract from 'https://esm.sh/png-chunks-extract';
 
 // --- DOM 요소 가져오기 ---
@@ -7,28 +6,18 @@ const fileInput = document.getElementById('cardFileInput');
 const statusDiv = document.getElementById('cardStatus');
 const downloadAllBtn = document.getElementById('cardDownloadAllBtn');
 
-let finalZip = null; // 추출된 파일을 담을 JSZip 인스턴스
+let finalZip = null;
 
 // --- 이벤트 리스너 설정 ---
 dropZone.addEventListener('click', () => fileInput.click());
-dropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropZone.classList.add('dragover');
-});
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
 dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.classList.remove('dragover');
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-        handleFile(files[0]);
-    }
+    if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
 });
-fileInput.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-        handleFile(e.target.files[0]);
-    }
-});
+fileInput.addEventListener('change', (e) => { if (e.target.files.length > 0) handleFile(e.target.files[0]); });
 downloadAllBtn.addEventListener('click', downloadZip);
 
 // --- 헬퍼 함수 ---
@@ -37,40 +26,70 @@ function updateStatus(message, type = '') {
     statusDiv.className = `status ${type}`;
 }
 
-function detectImageExtension(data) {
-    if (data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4E && data[3] === 0x47) return '.png';
-    if (data[0] === 0xFF && data[1] === 0xD8 && data[2] === 0xFF) return '.jpg';
-    if (data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46 && data[8] === 0x57 && data[9] === 0x45 && data[10] === 0x42 && data[11] === 0x50) return '.webp';
-    if (data[0] === 0x47 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x38) return '.gif';
-    return '.dat';
+/**
+ * ✨ [새로 추가] 파일의 첫 8바이트를 읽어 PNG인지 확인하는 함수
+ * @param {File} file - 확인할 파일 객체
+ * @returns {Promise<boolean>} PNG 파일이면 true를 반환
+ */
+async function isPng(file) {
+    if (file.size < 8) return false;
+    const pngHeader = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    const fileSlice = file.slice(0, 8); // 파일의 첫 8바이트만 잘라냄
+    const buffer = await fileSlice.arrayBuffer();
+    const uint8array = new Uint8Array(buffer);
+
+    // 8바이트를 순서대로 비교
+    for (let i = 0; i < pngHeader.length; i++) {
+        if (uint8array[i] !== pngHeader[i]) {
+            return false;
+        }
+    }
+    return true;
 }
 
-// --- 메인 파일 처리 로직 ---
+
+// --- ✨ [수정됨] 메인 파일 처리 로직 ---
 async function handleFile(file) {
     updateStatus(`'${file.name}' 처리 중...`);
     downloadAllBtn.style.display = 'none';
     finalZip = new JSZip();
 
     try {
-        if (file.name.toLowerCase().endsWith('.charx')) {
-            await handleCharx(file);
-        } else if (file.name.toLowerCase().endsWith('.png')) {
+        // 1. 파일 내용 기반으로 PNG인지 먼저 확인
+        if (await isPng(file)) {
+            console.log("PNG 형식으로 처리합니다.");
             await handlePng(file);
-        } else {
-            throw new Error("지원하지 않는 파일 형식입니다. '.png' 또는 '.charx' 파일을 선택해주세요.");
+        } 
+        // 2. PNG가 아니라면 ZIP(.charx)으로 처리 시도
+        else {
+            console.log("ZIP(.charx) 형식으로 처리합니다.");
+            try {
+                await handleCharx(file);
+            } catch (zipError) {
+                // ZIP으로 처리 실패 시, 지원하지 않는 파일로 최종 판단
+                console.error("ZIP으로 처리 실패:", zipError);
+                throw new Error("지원하지 않는 파일 형식입니다. PNG 헤더를 포함하거나 유효한 ZIP(.charx) 형식이 아닙니다.");
+            }
         }
-        updateStatus(`추출 완료! 총 ${Object.keys(finalZip.files).length}개의 파일을 찾았습니다.`, 'success');
-        if (Object.keys(finalZip.files).length > 0) {
+        
+        const fileCount = Object.keys(finalZip.files).length;
+        if (fileCount > 0) {
+            updateStatus(`추출 완료! 총 ${fileCount}개의 파일을 찾았습니다.`, 'success');
             downloadAllBtn.style.display = 'block';
+        } else {
+            updateStatus("완료되었지만, 추출할 에셋을 파일에서 찾지 못했습니다.", '');
         }
+
     } catch (error) {
         updateStatus(`오류 발생: ${error.message}`, 'error');
         console.error(error);
     }
 }
 
-// --- .charx (ZIP) 파일 처리 ---
+
+// --- .charx (ZIP) 파일 처리 (수정 없음) ---
 async function handleCharx(file) {
+    // JSZip.loadAsync는 ZIP 파일이 아니면 여기서 에러를 발생시킴
     const zip = await JSZip.loadAsync(file);
     const cardJsonFile = zip.file('card.json');
     if (!cardJsonFile) {
@@ -80,10 +99,7 @@ async function handleCharx(file) {
     const charData = JSON.parse(await cardJsonFile.async('string'));
     const assetsInfo = charData?.data?.assets || [];
 
-    if (assetsInfo.length === 0) {
-        updateStatus("경고: 'card.json'에서 에셋 정보를 찾지 못했습니다.", "warning");
-        return;
-    }
+    if (assetsInfo.length === 0) return;
 
     const promises = assetsInfo.map(async (assetInfo) => {
         const { uri, name, ext } = assetInfo;
@@ -105,13 +121,14 @@ async function handleCharx(file) {
     await Promise.all(promises);
 }
 
-// --- .png 카드 파일 처리 ---
+
+// --- .png 카드 파일 처리 (수정 없음) ---
 async function handlePng(file) {
     const buffer = await file.arrayBuffer();
-    // ✨ 2. 'window.extract'를 다시 'extract'로 변경
     const chunks = extract(new Uint8Array(buffer));
     const textChunks = chunks.filter(chunk => chunk.name === 'tEXt');
     
+    // (이하 로직은 기존과 동일)
     let mainDataStr = null;
     const assets = {};
 
@@ -143,10 +160,7 @@ async function handlePng(file) {
         }
     });
 
-    if (Object.keys(assets).length === 0) {
-        updateStatus("경고: PNG 파일에서 추출할 에셋을 찾지 못했습니다.", "warning");
-        return;
-    }
+    if (Object.keys(assets).length === 0) return;
 
     let charData = null;
     if (mainDataStr) {
@@ -166,16 +180,14 @@ async function handlePng(file) {
         
         assetList.forEach(item => {
             let uri, name, ext;
-            if (typeof item === 'object' && item !== null && !Array.isArray(item)) { // v3
+            if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
                 ({ uri, name, ext } = item);
-            } else if (Array.isArray(item) && item.length >= 2) { // v2
+            } else if (Array.isArray(item) && item.length >= 2) {
                 const pathParts = item[0].split(/[\\/]/);
                 name = pathParts.pop().replace(/\.[^/.]+$/, "");
                 uri = item[1];
                 ext = item.length > 2 ? item[2] : 'dat';
-            } else {
-                return;
-            }
+            } else { return; }
             
             if (uri && uri.startsWith('__asset:')) {
                 const assetIndex = parseInt(uri.split(':').pop(), 10);
@@ -191,7 +203,15 @@ async function handlePng(file) {
         });
     }
 
-    // 이름 없는 나머지 에셋 처리
+    // 이름 없는 나머지 에셋 처리...
+    const detectImageExtension = (data) => {
+        if (data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4E && data[3] === 0x47) return '.png';
+        if (data[0] === 0xFF && data[1] === 0xD8 && data[2] === 0xFF) return '.jpg';
+        if (data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46) return '.webp';
+        if (data[0] === 0x47 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x38) return '.gif';
+        return '.dat';
+    };
+
     for (const [index, data] of Object.entries(assets)) {
         if (!foundIndices.has(parseInt(index, 10))) {
             const ext = detectImageExtension(data);
@@ -200,7 +220,8 @@ async function handlePng(file) {
     }
 }
 
-// --- ZIP 다운로드 함수 ---
+
+// --- ZIP 다운로드 함수 (수정 없음) ---
 function downloadZip() {
     if (finalZip && Object.keys(finalZip.files).length > 0) {
         const originalFileName = fileInput.files[0].name.replace(/\.[^/.]+$/, "");
