@@ -1,4 +1,5 @@
 # 용도
+- https://ariannaheartbell.github.io/risu-asset-extractor2/ 여기로 
 - 봇카드: charx, png, jpeg(명시하진 않았으나 확인) 내 이미지 음성 영상 등등 에셋 추출가능.
 - risum 모듈 속 이미지나 음성파일 등 에셋 추출 가능. 
 
