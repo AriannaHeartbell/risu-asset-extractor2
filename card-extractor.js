@@ -1,3 +1,6 @@
+// ✨ 1. 파일 최상단에 import 문 추가
+import extract from 'https://esm.sh/png-chunks-extract';
+
 // --- DOM 요소 가져오기 ---
 const dropZone = document.getElementById('cardDropZone');
 const fileInput = document.getElementById('cardFileInput');
@@ -105,8 +108,8 @@ async function handleCharx(file) {
 // --- .png 카드 파일 처리 ---
 async function handlePng(file) {
     const buffer = await file.arrayBuffer();
-    // ✨ 여기가 수정된 부분입니다. 'window.extract'로 변경!
-    const chunks = window.extract(new Uint8Array(buffer));
+    // ✨ 2. 'window.extract'를 다시 'extract'로 변경
+    const chunks = extract(new Uint8Array(buffer));
     const textChunks = chunks.filter(chunk => chunk.name === 'tEXt');
     
     let mainDataStr = null;
@@ -125,7 +128,6 @@ async function handlePng(file) {
             if (key.startsWith('chara-ext-asset_')) {
                 const assetIndex = parseInt(key.replace('chara-ext-asset_:', ''), 10);
                 if (!isNaN(assetIndex)) {
-                    // Base64 디코딩
                     const byteString = atob(value);
                     const byteArray = new Uint8Array(byteString.length);
                     for (let i = 0; i < byteString.length; i++) {
