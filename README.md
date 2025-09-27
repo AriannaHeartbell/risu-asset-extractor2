@@ -1,3 +1,7 @@
+# 용도폐기:
+https://github.com/AriannaHeartbell/risu-asset-extractor2 이쪽으로
+
+
 # 용도
 - https://ariannaheartbell.github.io/risu-asset-extractor2/ 여기로 
 - 봇카드(charx, png. 봇카드면 확장자 무관함) 내 이미지 음성 영상 등등 에셋 추출가능.
