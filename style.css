@@ -174,3 +174,23 @@ h2 {
     border-top: 1px solid #eee;
     padding-top: 1em;
 }
+
+/* 푸터 스타일 */
+footer {
+    text-align: center;
+    margin-top: 2.5em;
+    padding-top: 1.5em;
+    border-top: 1px solid #eee;
+}
+
+/* 푸터의 링크(아이콘) 스타일 */
+footer a svg {
+    fill: #555; /* 아이콘 기본 색상 */
+    transition: fill 0.2s ease-in-out, transform 0.2s ease-in-out; /* 부드러운 전환 효과 */
+}
+
+/* 마우스를 올렸을 때 아이콘 스타일 */
+footer a:hover svg {
+    fill: #000; /* 아이콘 색상을 더 진하게 변경 */
+    transform: scale(1.1); /* 아이콘을 살짝 확대 */
+}
