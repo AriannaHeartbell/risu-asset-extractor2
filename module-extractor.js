@@ -88,18 +88,24 @@ async function handleFileSelect(file) {
             URL.revokeObjectURL(url);
         };
 
-        if (!moduleInfo.assets || moduleInfo.assets.length === 0) {
+        // --- 변경된 부분 시작 ---
+
+        const totalAssets = moduleInfo.assets ? moduleInfo.assets.length : 0; // 1. 전체 에셋 개수 저장
+
+        if (totalAssets === 0) {
             statusDiv.textContent = '완료: 이 파일에는 추출할 에셋이 없습니다.';
             statusDiv.className = 'status success';
             return;
         }
 
-        statusDiv.textContent = `"${moduleInfo.name}" 모듈에서 ${moduleInfo.assets.length}개의 에셋을 발견했습니다.`;
+        statusDiv.textContent = `"${moduleInfo.name}" 모듈에서 ${totalAssets}개의 에셋을 발견했습니다. 추출을 시작합니다...`;
+
+        // --- 변경된 부분 끝 ---
 
         const zip = new JSZip();
         let assetIndex = 0;
 
-        while (pos < uint8Array.length && assetIndex < moduleInfo.assets.length) {
+        while (pos < uint8Array.length && assetIndex < totalAssets) { // 조건문에 totalAssets 사용
             const marker = readByte();
             if (marker === 0) break;
             if (marker !== 1) continue;
@@ -127,6 +133,10 @@ async function handleFileSelect(file) {
 
             zip.file(filename, assetDataDecoded);
             assetIndex++;
+
+            // --- 추가된 부분 시작 ---
+            statusDiv.textContent = `추출 중... (${assetIndex} / ${totalAssets})`; // 2. 루프 내에서 상태 업데이트
+            // --- 추가된 부분 끝 ---
         }
 
         if (assetIndex > 0) {
@@ -148,7 +158,9 @@ async function handleFileSelect(file) {
         }
 
         statusDiv.className = 'status success';
-        statusDiv.textContent += ' (추출 완료!)';
+        // --- 변경된 부분 시작 ---
+        statusDiv.textContent = `추출 완료: 총 ${totalAssets}개의 에셋 중 ${assetIndex}개를 성공적으로 추출했습니다.`; // 3. 최종 완료 메시지 수정
+        // --- 변경된 부분 끝 ---
 
     } catch (error) {
         statusDiv.textContent = `오류가 발생했습니다: ${error.message}`;
